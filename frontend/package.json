@@ -1,0 +1,21 @@
+{
+  "name": "pyramid-card-match",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build && node sync.mjs",
+    "verify": "node scripts/verify-deals.mjs",
+    "corpus": "node scripts/build-corpus.mjs",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  }
+}

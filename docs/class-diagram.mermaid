@@ -1,0 +1,164 @@
+classDiagram
+    class Card {
+        +number id
+        +string suit
+        +boolean red
+        +string rank
+        +number value
+        +Zone zone
+        +number r
+        +number c
+        +boolean removed
+    }
+    class GameState {
+        +Card[] cards
+        +Card[][] pyramid
+        +Card[] stock
+        +Card[] waste
+        +number selectedId
+        +number steps
+        +number startedAt
+        +boolean finished
+        +boolean busy
+        +number lastFlipId
+    }
+    class GameRules {
+        <<module game.ts>>
+        +createDeck() Card[]
+        +createGame() GameState
+        +isExposed(s, card) boolean
+        +isPlayable(s, card) boolean
+        +isPair(a, b) boolean
+        +playableCards(s) Card[]
+        +hasAvailableMove(s) boolean
+        +selectOrMatch(s, card) SelectResult
+        +drawOne(s) boolean
+        +evaluate(s) GameOutcome
+        +remainingCount(s) number
+        +elapsedSeconds(s) number
+    }
+    class SolverState {
+        +number[] values
+        +number alive
+        +number[] pool
+    }
+    class SolverContext {
+        +Map memo
+        +number nodeBudget
+        +number deadlineMs
+        +number nodes
+        +boolean exhausted
+    }
+    class PyramidSolver {
+        <<module solver.ts>>
+        +pyramidIndex(r, c) number
+        +isExposedAt(alive, p) boolean
+        +deriveSolverState(s) SolverState
+        +createSolverContext() SolverContext
+        +isSolvable(state, opt) SolveVerdict
+        +projectMove(state, m) SolverState
+        +wasteBalanced(pool) boolean
+    }
+    class DealMeta {
+        +Map plannedPartner
+        +Array plannedWastePairs
+        +PlannedAction[] plan
+        +object stats
+    }
+    class DealGenerator {
+        <<module deal.ts>>
+        -DealMeta activeDealMeta
+        +createSolvableGame(deck, opt) GameState
+        +getActiveDealMeta() DealMeta
+        +replayPlan(state, plan) boolean
+        -buildPlan() PlannedAction[]
+        -assignCards() void
+        -fallback() GameState
+    }
+    class HintMove {
+        +string kind
+        +number[] cards
+        +number tier
+    }
+    class HintResult {
+        +HintMove move
+        +number tier
+        +string text
+        +boolean degraded
+    }
+    class HintEngine {
+        <<module hint.ts>>
+        +getHint(s, opt) HintResult
+        +hintText(tier, degraded) string
+        -enumerateLegalMoves(s) HintMove[]
+        -tierOf(m) number
+        -isOnPlan(m, meta) boolean
+    }
+    class App {
+        <<App.vue>>
+        +reactive game
+        +ref phase
+        +ref modal
+        +ref hintIds
+        +ref hintStock
+        +ref hintText
+        +onHintClick() void
+        +onCardClick(card) void
+        +onStockClick() void
+        +freshGame() void
+        +checkOutcome() void
+        +applyTopic(p) void
+        +clearHint() void
+    }
+    class PyramidBoard {
+        <<PyramidBoard.vue>>
+        +props game
+        +props hintIds
+        +props hintStock
+        +props hintText
+        +emit card-click
+        +emit stock-click
+    }
+    class InfoModal {
+        <<InfoModal.vue>>
+        +props title
+        +props subtitle
+        +props dismissible
+        +emit close
+    }
+    class TopicModal {
+        <<TopicModal.vue>>
+        +props topicKey
+        +props question
+        +emit apply
+        +emit close
+    }
+    class FunDictionary
+    class ResultModal
+    class Diagnostics {
+        <<module diagnostics.ts>>
+        +verifyDeals(n, opt) VerifyReport
+    }
+
+    GameState "1" *-- "52" Card : 持有(Card/GameState 形状不变)
+    GameRules ..> GameState : 产生/修改
+    DealGenerator ..> GameRules : 委托 createDeck 装配
+    DealGenerator ..> PyramidSolver : replayPlan + 双目标校验
+    DealGenerator --> DealMeta : 产出(模块级单例)
+    PyramidSolver ..> SolverState : 读取
+    PyramidSolver ..> SolverContext : 共享 memo/预算
+    HintEngine ..> GameRules : 复用 playableCards/isPair
+    HintEngine ..> PyramidSolver : 逐候选 reachability(权威)
+    HintEngine ..> DealMeta : 仅同档排序(软偏好)
+    HintEngine --> HintResult : 返回
+    HintResult *-- HintMove
+    Diagnostics ..> DealGenerator : 批量验证
+    Diagnostics ..> HintEngine : 提示耗时采样
+    App --> GameRules : createGame/selectOrMatch/drawOne/evaluate
+    App --> HintEngine : getHint
+    App --> PyramidBoard : game + hintIds/hintStock/hintText
+    App --> InfoModal : modal 枚举驱动
+    App --> TopicModal : slot
+    App --> ResultModal : outcome/stats
+    InfoModal o-- FunDictionary : 「更多」分节
+    PyramidBoard ..> HintMove : 高亮 id 跨区

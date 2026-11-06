@@ -1,0 +1,65 @@
+sequenceDiagram
+    autonumber
+    actor U as 玩家
+    participant App as App.vue
+    participant G as game.ts
+    participant D as deal.ts
+    participant S as solver.ts
+    participant H as hint.ts
+    participant B as PyramidBoard.vue
+    participant R as ResultModal.vue
+
+    Note over App,G: ① 首屏直入（0 次点击，S5）
+    App->>G: createGame()
+    G->>D: createSolvableGame(createDeck(), {goal:'full'})
+    D->>D: 行内配对 12 组 + 奇数行 4 张 K + 手牌互补对相邻（O(52)）
+    D->>D: 装配 GameState（zone/r/c/removed 沿用原路径，形状不变）
+    D->>S: deriveSolverState() + replayPlan() + isSolvable('pyramid'|'full')
+    S-->>D: solvable（构造牌局 ≤22 节点 / <1ms）
+    D->>D: 写模块级 activeDealMeta（plannedPartner / plan / stats）
+    D-->>G: GameState
+    G-->>App: GameState（reactive 包装）
+    App->>B: :game :hintIds=[] :hintStock=false :hintText=''
+    App->>U: 首屏即棋盘，可直接点第一张牌
+
+    Note over U,H: ② 点「提示」（busy 去抖，不限次无冷却）
+    U->>App: click 提示
+    App->>App: clearHint() → onHintClick()
+    App->>H: getHint(game)
+    H->>G: playableCards() / isPair() / isPlayable()
+    G-->>H: 全部可点牌
+    H->>H: 枚举 1~6 档候选并按档分组
+    H->>S: createSolverContext(20000 节点 / 12ms，全提示共享 memo)
+    loop 档 1→6，逐候选
+        H->>S: projectMove(after) → isSolvable('pyramid' 硬) / isSolvable('full' 软)
+        S-->>H: solvable | unsolvable | unknown
+    end
+    H->>D: getActiveDealMeta()（仅同档排序，不作唯一依据）
+    D-->>H: plannedPartner
+    H-->>App: HintResult{move, tier, text, degraded}
+    App->>B: :hintIds=[id...] :hintStock :hintText
+    B->>U: 金字塔/明牌跨区描边+呼吸高亮 + 一行短文案
+
+    Note over U,R: ③ 玩家点高亮的牌 → 消除 → 判定
+    U->>B: 点推荐的一对（或单张 K / 手牌堆）
+    B->>App: @card-click(card) 或 @stock-click()
+    App->>App: clearHint() + busy=true
+    alt 消牌
+        App->>G: selectOrMatch(game, card)
+        G-->>App: 'removed'（或 'shake' / 'blocked'）
+        App->>App: vanishIds + 380ms 淡出（沿用现有动画）
+    else 翻牌
+        App->>G: drawOne(game)
+        G-->>App: true + lastFlipId
+    end
+    App->>G: evaluate(game) / remainingCount(game) / elapsedSeconds(game)
+    G-->>App: 'playing' | 'cleared' | 'stuck'
+    alt cleared 或 stuck
+        App->>App: game.finished=true, finalElapsed, modal='result'
+        App->>R: :outcome :stats :readingText :disclaimer ...
+        R->>U: 结果弹窗（含精简「关于趣味解答」+「再摆一局」）
+        U->>R: 再摆一局
+        R->>App: @restart → freshGame() → createGame()（回到 ①）
+    else playing
+        App->>B: HUD 数值与棋盘刷新，等待下一次点击/提示
+    end

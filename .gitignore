@@ -1,0 +1,29 @@
+# ---------------------------------------------------------------------------
+# 金字塔配对 · 休闲消牌 —— 项目根 .gitignore
+#
+# 重要：根 index.html 与根 assets/ 是「唯一对外入口 / 已发布链接指向的交付产物」，
+#       由 npm run build → frontend/sync.mjs 生成，必须随仓库提交。
+#       根 index.html 用 ./assets/index-*.js|css 相对路径引用资源，
+#       一旦忽略根 assets/，线上打开会 404。
+#       注意区分：frontend/dist/ 是 Vite 构建【中间产物】（忽略），
+#                 根 assets/ 是同步后的【交付产物】（不忽略）。
+#       因此本文件【不要】写 assets/ 或 dist/ 这种无路径限定的通配规则。
+# ---------------------------------------------------------------------------
+
+# 依赖安装产物（frontend/node_modules 约 59MB）
+node_modules/
+
+# Vite 构建中间产物（每次 npm run build 重建）
+frontend/dist/
+
+# macOS 目录元数据
+.DS_Store
+
+# 本地日志
+*.log
+
+# WorkBuddy 本地会话 / 应用元数据
+.workbuddy/
+
+# WorkBuddy 应用卡片本地文件（含发布 locator，公开仓库不入库）
+.wbapp_*.genie
