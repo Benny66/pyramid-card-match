@@ -3,6 +3,8 @@
 > 本文件写给在本仓库执行「改代码 / 写文档 / 做 Review / 发版」的 AI Agent；面向人的项目说明见 `README.md`。
 > **先读文档、再动源码；先跑验证、再谈交付。** 文档与源码冲突时**以源码为准**并回报，不要按印象改。
 
+> ⚠️ **版本注记（2026-11-06 晚）**：V3 的「构造式发牌」已被**随机洗牌 + 死局过滤**取代——用户试玩发现旧方案「金字塔每一层都能凑 13、手牌成对」，牌面不随机。`docs/architecture-v3.md` §0/§1.2、`docs/prd-v3-incremental.md` P0-1、`docs/qa-v3-delivery-check.md` 中关于「构造式发牌 / 构造性证明 / plan 回放」的描述均为**历史结论**，保留原文不回改；发牌方案一律以本文件 **§4.1** 与 `frontend/src/deal.ts` 源码为准。
+
 ---
 
 ## 1. 项目定位、技术栈、入口与构建同步机制
@@ -29,7 +31,7 @@
 
 1. `README.md` — 玩法、快速开始、目录结构、验收数据、已知问题。
 2. `docs/prd-v3-incremental.md` — V3 增量 PRD：需求池 P0-1~P0-7、**§3.2 六档提示**、**§4 不改清单 N1~N9**、§2.2 验收指标 S1~S6。
-3. `docs/architecture-v3.md` — 重点：**§0 结论速览**（含全部实测数据）、**§1.2 构造式发牌**、**§1.3 提示不破坏解**、§1.4 松弛等价与状态编码、**§2 文件清单**、**§3.1 接口签名**、**§7 任务列表 T01~T05**、**§8 共享约定**。
+3. `docs/architecture-v3.md` — 重点：**§1.3 提示不破坏解**、§1.4 松弛等价与状态编码、**§2 文件清单**、**§3.1 接口签名**、**§7 任务列表 T01~T05**、**§8 共享约定**。⚠️ §0/§1.2 的构造式发牌已被随机洗牌方案取代（见本文件 §4.1 与版本注记），只作历史背景读。
 4. `docs/class-diagram.mermaid`、`docs/sequence-diagram.mermaid` — 类图与「发牌 → 首屏 → 提示 → 消除 → 判定」时序。
 5. 源码逐条核对：`frontend/src/game.ts`（规则真源 + 导出契约）→ `solver.ts` → `deal.ts` → `hint.ts` → `diagnostics.ts` → `App.vue` → `frontend/scripts/verify-deals.mjs`、`frontend/sync.mjs`、`frontend/package.json`。
 
@@ -37,11 +39,11 @@
 
 ```bash
 cd frontend
-npm run verify -- 1000   # 结构 / 双目标可解 / plan 回放 / 按提示重放 20 局；失败退出码 1
+npm run verify -- 1000   # 结构 / 双目标可解 / 随机性四指标 / 按提示重放 20 局；失败退出码 1
 npm run build            # 构建 + 同步到项目根；确认根 index.html 与 assets/ 被刷新
 ```
 
-`npm run verify` 用 Node 22 原生 type-stripping 直接加载 `.ts`（22.18+ 默认开启），**必须 Node 22+**，不需要额外安装 tsx / ts-node / vitest。当前实测基线见 `README.md`「验收数据」：`structureOk/pyramidSolvable/fullSolvable/planReplayOk` 全 1000、`fallbackCount=0`、`failures=[]`、`hintPyramidCleared=20/20`、`degradedCount=0`。
+`npm run verify` 用 Node 22 原生 type-stripping 直接加载 `.ts`（22.18+ 默认开启），**必须 Node 22+**，不需要额外安装 tsx / ts-node / vitest。当前实测基线：`structureOk/pyramidSolvable/fullSolvable` 全 1000、`fallbackCount=0`、`failures=[]`、`hintPyramidCleared=20/20`、`degradedCount=0`；随机性指标 `rawSolvableRate≈0.668`、`avgAttempts≈1.50`、`avgRowComplementPairs≈3.46`、`avgStockAdjacentPairs≈1.71`。`VerifyReport.planReplayOk` 已移除（随机发牌不再有构造计划），别再找它。
 
 ---
 
@@ -66,15 +68,14 @@ npm run build            # 构建 + 同步到项目根；确认根 index.html �
 
 ## 4. V3 架构决策与踩坑清单（最重要，每条都写清「为什么」）
 
-### 4.1 可解发牌：为什么选「构造式发牌」，而不是「随机洗牌 + 求解器验证 + 重洗」
+### 4.1 发牌：随机洗牌 + 死局过滤（V3 构造式方案已废弃）
 
-- **实测背景要诚实**：本变体（24 张手牌可随时逐张全翻、明牌永久常驻、无手牌上限、K 可单消）比标准 Pyramid 宽松得多，随机牌局「清空金字塔 / 52 张全消」可解率 **66.90%（N=3000）**，`P(200 次重洗全败) ≈ 9.24e-97` —— **200 次重洗在统计上其实够用**，不要沿用「随机可解率极低」的旧先验。
-- **仍否决重洗方案的四条原因**：
-  1. S1 是 **100% 硬门槛**，重洗只能给**概率保证**；一旦叠加「300ms 超时」这个实际约束，允许的重洗次数骤降，就存在**超时后发出未验证 / 不可解牌的尾部风险**，验收还得额外测兜底分支。构造式是 O(52) 的构造性证明，**0 次重洗**。
-  2. **首屏成本不可控**：随机牌局求解 avg 1,724 / max 38,769 节点（~15ms），悲观连败时理论上可达秒级，与「绝不阻塞首屏」冲突；构造式单局 ≤22 节点、约 0.02ms。
-  3. **关键：无法塑造提示分布**。随机可解局的解常依赖大量「金字塔+明牌」甚至明牌清理，**首屏可能要连翻十几张手牌**，与用户「应尽可能优先组合金字塔上的牌」直接相悖。构造式保证**整座塔只靠塔内配对 + 塔 K 就能清空，一次手牌都不用翻**。
-  4. 不白送 P1-1：要「52 张全消可解」得再跑一个更严格目标；构造时**天然满足**（实测 1000/1000 双目标）。
-- **落地**：`deal.ts::createSolvableGame()` 先造「12 组塔内互补配对 + 4 个奇数行落单 K + 12 对手牌互补对相邻」的消除计划，再把真实 52 张牌填进 28 塔位与 24 手牌；`replayPlan()` 做 O(28) 构造性证明，`isSolvable('pyramid' | 'full')` 双确认；L1 正常构造 → L2 固定种子 `mulberry32(0x5eed)` → L3 纯 Fisher-Yates 兜底，`game.ts::createGame()` 外层再包 `try/catch`，**永不抛异常、首屏一定可点牌**。
+- **为什么改**：V3 曾用「构造式发牌」——先造 12 组塔内互补配对 + 4 个奇数行 K + 12 对手牌互补对，再倒推摆牌，确实 100% 可解，但**牌面有明显人造规律**：用户试玩一眼看出「金字塔每一层都能凑 13」「翻牌成对」，游戏变成背答案。已按用户要求废弃，不要恢复。
+- **现行方案**：`deal.ts::createSolvableGame()` = 纯 Fisher-Yates 洗牌 → 按 `r/c` 装配 28 塔位 + 24 手牌 → `deriveSolverState()` + `isSolvable(goal:'full')` 判一次 → **整副无解就重洗**（`maxAttempts=200`、总预算 120ms、单次求解 50_000 节点 / 40ms）。`'unknown'` 保守视为不可接受，绝不发出未验证牌局；只有超时/异常才退回纯随机牌局（`fallback=true`）并 `console.warn`。`game.ts::createGame()` 外层仍有 `try/catch`，**永不阻塞首屏**。
+- **实测（N=1000）**：筛选前随机牌局可解率 **66.8%**（与理论 66.9% 一致，证明牌面是真洗出来的）、平均洗 **1.50** 副命中、`fallbackCount=0`、`avgCreateMs≈0.82ms` / `maxCreateMs≈23ms`；1000/1000 金字塔可解 + 1000/1000 全消可解、按提示 20/20 清空金字塔。
+- **随机性护栏（diagnostics.ts / verify-deals.mjs）**：`avgRowComplementPairs`（构造式恒 12 → 现 3.46）、`avgStockAdjacentPairs`（构造式恒 12 → 现 1.71）、`rawSolvableRate`、`avgAttempts` 四个指标进入 `VerifyReport`，`npm run verify -- 1000` 打印并断言 `fallbackCount=0`。**任何改发牌的改动都必须复核这四个数**：若行内互补对或手牌相邻对回到 12，说明又引入了人工构造。
+- **不再有参考解**：`replayPlan()` 已删除，`DealMeta.plan` 恒空，`hint.ts::isOnPlan` 基本恒 false，提示完全依赖实时 reachability（§4.5）。`VerifyReport.planReplayOk` 已移除。
+- **红线**：只过滤「整副牌无解」，**绝不为了可解去调整单张牌的位置或点数**；否则又回到构造式的老问题。
 
 ### 4.2 求解器松弛等价：`projectMove` 的 `draw` 不改变 `(alive, pool)` 是正确行为，不是 bug
 
@@ -87,22 +88,22 @@ npm run build            # 构建 + 同步到项目根；确认根 index.html �
 - 编码：`values[28]`（静态塔牌点数）+ `alive`（28 位掩码，`1` = 该塔位牌仍在）+ `pool[14]`（`pool[v]` = 当前可用明牌中点数为 v 的张数，含全部未翻手牌，下标 0 不用）；`pyramidIndex(r,c) = r*(r+1)/2 + c`；`isExposedAt(alive,p)` 是 `game.ts::isExposed` 的位掩码等价实现；`alive` 可达值只有 **1430** 个序理想。
 - **踩坑**：一次 `getHint()` 里 hard(`'pyramid'`) 与 soft(`'full'`) **共用同一个 `SolverContext.memo`**，而两种目标的终点判定不同（`'full'` 还要 `wasteBalanced(pool)`）。因此记忆化 key **必须带 `goal` 前缀**（源码：`goal + '|' + alive + '|' + pool.slice(1,13).join('')`）；否则 hard / soft **串缓存**会把「塔可清但全消不可解」的状态误判，提示硬校验随之失真。
 
-### 4.4 `DealMeta` 参考解必须放 `deal.ts` 模块级单例，绝不能挂到 `GameState`
+### 4.4 `DealMeta` 保留模块级单例，但参考解恒为空
 
-- `App.vue` 用 `reactive(createGame())`，`freshGame()` 用 `Object.assign(game, createGame())`。若把 `plannedPartner` / `plan` 挂到 `GameState` 上：① `reactive()` 的 Proxy 会包住 `Map`、`Object.assign` 会整体替换引用导致**丢引用**；② 直接违反 P0-1④「不改 `GameState` 形状」。
-- 正解：`deal.ts` 的模块级普通变量 `activeDealMeta`（全场同一时刻只有一副活动牌），`createGame()` 每次刷新，`getActiveDealMeta()` 只读，**不进 Vue 响应式**，`freshGame()` 无需额外 `reset()`。
+- 随机发牌不再构造消除计划：`plannedPartner` / `plannedWastePairs` / `plan` 全部为空，`stats.attempts` 记录本次一共洗了几副牌（供随机性统计）。保留空结构是为了不改动 `hint.ts` 的 import 契约，不要「顺手删字段」而破坏类型。
+- `activeDealMeta` 仍是 `deal.ts` 的**模块级普通变量**（不挂 `GameState`、不进 Vue 响应式）：`App.vue` 用 `reactive(createGame())`，`freshGame()` 用 `Object.assign(game, createGame())`，挂到 `GameState` 上会被 Proxy 包住 `Map` 且被 `Object.assign` 整体替换导致丢引用，也违反「不改 `GameState` 形状」。`createGame()` 每次刷新，`getActiveDealMeta()` 只读。
 
 ### 4.5 提示 = 实时 reachability 为唯一权威，参考解只作同档排序
 
-- 参考解单独用会在玩家**任意一次偏离后立刻失效**，需要「状态哈希比对 → 重放 → 重同步」，还表达不了「同一最高档里挑一个保解的」。实时求解是无状态纯函数，`deriveSolverState(liveGameState)` 每次从当前真实局面重推，**天然自愈**：偏离越大 `isOnPlan` 命中越少，自动退化为纯 reachability，**不需要重放 / 重同步 / 增量求解分支**。
-- **三处目标别混用**：发牌构造默认 `goal:'full'`（白送 P1-1）；提示**硬校验固定 `'pyramid'`**（严格 D1）；`'full'` 只作同档**软偏好**；QA 的 S1 按 `'pyramid'` 统计。
+- 随机发牌下参考解恒为空，`isOnPlan` 基本不参与排序，**实时 reachability 是唯一权威**。实时求解是无状态纯函数，`deriveSolverState(liveGameState)` 每次从当前真实局面重推，玩家任意偏离后天然自愈，**不需要重放 / 重同步 / 增量求解分支**。
+- **三处目标别混用**：发牌筛选默认 `goal:'full'`（同时保证金字塔可解与 52 张全消可解）；提示**硬校验固定 `'pyramid'`**；`'full'` 只作同档**软偏好**；QA 的 S1 按 `'pyramid'` 统计。
 - **`'unknown'`（预算 / 超时耗尽）一律乐观视为可用**：hard 判定写 `verdict !== 'unsolvable'`，**绝不出现「有合法走法却报无提示」**（PRD 3.4 / S3）；`'unsolvable'` 是唯一可判「不安全」的值，参考解与同档排序同时兜住质量。
-- 预算：一次 `getHint()` **只创建一个** `SolverContext`（`nodeBudget=20_000` / `deadlineMs=12`，所有候选共享 memo 与总预算）；发牌校验 `50_000` / `40`。架构原型实测单次提示 avg 0.172ms / max 0.734ms（保守估计、无共享 memo），本机 `npm run verify` 采样 `maxHintMs≈0.363ms`，**同步执行，不用 Web Worker**（Worker 的 `postMessage` 往返比计算本身还慢，且异步加载态会破坏 S5「0 次点击」）。
+- 预算：一次 `getHint()` **只创建一个** `SolverContext`（`nodeBudget=20_000` / `deadlineMs=12`，所有候选共享 memo 与总预算）；发牌校验 `50_000` / `40`。随机牌局下本机 `npm run verify` 采样 `avgHintMs≈0.21ms` / `maxHintMs≈4.96ms`（比构造式牌局略高，因搜索树更大），**同步执行，不用 Web Worker**（Worker 的 `postMessage` 往返比计算本身还慢，且异步加载态会破坏 S5「0 次点击」）。
 
 ### 4.6 6 档优先级严格短路
 
 - 顺序：**塔+塔(1) > 塔+明牌(2) > 塔 K 单消(3) > 明牌+明牌(4) > 明牌 K 单消(5) > 翻一张手牌(6)**；`for tier = 1..6`，某档一找到**保解**候选立即 `return`，只有该档所有候选都 `unsolvable` 或本档无候选才继续 ⇒ **前 3 档有解就绝不推荐 4~5 档**（用户「明牌区有组合的也不组合」）。
-- 同档排序：`onPlan desc → soft desc → cardId asc`；参考解 / 全消只是**软偏好**，永不绕过 hard 校验。K 没有互补值，天然只出现在档 3 / 5。
+- 同档排序：`onPlan desc → soft desc → cardId asc`；随机发牌下 `onPlan` 恒 false（draw 除外），实际按 `soft desc → cardId asc`，全消只是**软偏好**，永不绕过 hard 校验。K 没有互补值，天然只出现在档 3 / 5。
 
 ### 4.7 导入风格、循环依赖、零新增依赖
 
@@ -156,10 +157,10 @@ Git：远端 `git@github.com:Benny66/pyramid-card-match.git`，分支 `main`。�
 
 | 任务 | 动哪些文件 | 必跑命令 / 验收 |
 | --- | --- | --- |
-| **改玩法 / 规则 / 发牌 / 提示** | 规则真源 `frontend/src/game.ts`（**红线，慎改**）；发牌 `deal.ts`、求解 `solver.ts`、提示 `hint.ts`；必要时 `diagnostics.ts` | `npm run verify -- 1000`（结构 / 双目标可解 / 20 局按提示重放全过）+ `npm run build` |
+| **改玩法 / 规则 / 发牌 / 提示** | 规则真源 `frontend/src/game.ts`（**红线，慎改**）；发牌 `deal.ts`（**只过滤死局，禁止调整单张牌位置**）、求解 `solver.ts`、提示 `hint.ts`；必要时 `diagnostics.ts` | `npm run verify -- 1000`（结构 / 双目标可解 / 随机性四指标 / 20 局按提示重放全过）+ `npm run build` |
 | **改文案**（规则 9 条 / 免责 / 趣味词典 / 话题） | `App.vue` 的 `rules[]`、`readings.ts`（**`DISCLAIMER` / `DICT_DISCLAIMER` / `REPLAY_LINES` 一字不改，只移展示位置**）、`components/FunDictionary.vue`、`components/TopicModal.vue`、`corpus.ts` | `npm run build`；人工走查「规则 / 话题 / 更多」三个弹窗与结果弹窗 |
 | **改 UI / 样式 / 响应式** | `App.vue`、`components/*.vue`、`frontend/src/style.css`（浅色视觉不变） | `npm run build`；浏览器走查首屏 0 次点击、375px 无横向溢出、提示跨区高亮、单 `modal` 互斥 |
-| **加测试 / 改诊断** | `frontend/src/diagnostics.ts`（新断言加进 `VerifyReport`）、`frontend/scripts/verify-deals.mjs` | `npm run verify -- 1000`：退出码 0、`failures=[]`、`pyramidSolvable=n` |
+| **加测试 / 改诊断** | `frontend/src/diagnostics.ts`（新断言加进 `VerifyReport`）、`frontend/scripts/verify-deals.mjs` | `npm run verify -- 1000`：退出码 0、`failures=[]`、`pyramidSolvable=n`、`fallbackCount=0`、随机性四指标未退化 |
 | **重建趣味语料** | `frontend/scripts/build-corpus.mjs` / `corpus-cards.mjs` / `corpus-topics.mjs` → `frontend/src/data/reading-corpus.ts`（N5 红线，非必要不动） | `npm run corpus`，再 `npm run build` |
 | **发版 / 更新到线上** | 只跑构建让 `sync.mjs` 刷新**根 `index.html` + 根 `assets/`**；提交这两个产物 | `npm run build` → 确认根产物已提交 → **等用户本轮明确说「发布 / 上线 / 更新到线上」** 再发布（覆盖更新，链接不变） |
 

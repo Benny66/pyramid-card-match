@@ -1,4 +1,6 @@
-// 提示引擎：6 档严格递减，实时 reachability 为唯一权威，参考解仅作同档排序软偏好。
+// 提示引擎：6 档严格递减，实时 reachability 为唯一权威。
+// 随机发牌不再产生构造计划，参考解恒为空；isOnPlan 因此恒 false（draw 除外），
+// 只影响同档排序的软偏好，不参与任何可解性判定。
 // 规则判定一律复用 game.ts 的 playableCards / isPair / isPlayable，不写第二份规则。
 import type { Card, GameState } from './game.ts'
 import { playableCards, isPair, isPlayable } from './game.ts'
@@ -93,7 +95,7 @@ function enumerateLegalMoves(s: GameState): Candidate[] {
   return result
 }
 
-/** 参考解命中判定：只用于同档排序，永不绕过 hard 校验。 */
+/** 参考解命中判定：只用于同档排序，永不绕过 hard 校验。随机发牌下恒为空集。 */
 function isOnPlan(m: HintMove, cardObjs: Card[], meta: DealMeta): boolean {
   if (m.kind === 'draw') return true
   if (m.kind === 'singleK') {

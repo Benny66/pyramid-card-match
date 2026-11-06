@@ -10,7 +10,7 @@ const ok =
   report.structureOk === n &&
   report.pyramidSolvable === n &&
   report.fullSolvable === n &&
-  report.planReplayOk === n &&
+  report.fallbackCount === 0 &&
   report.failures.length === 0
 
 if (!ok) {
@@ -21,8 +21,11 @@ console.log(
   '[verify] OK  structureOk=' + report.structureOk +
   ' pyramidSolvable=' + report.pyramidSolvable +
   ' fullSolvable=' + report.fullSolvable +
-  ' planReplayOk=' + report.planReplayOk +
   ' fallbackCount=' + report.fallbackCount +
+  ' avgAttempts=' + report.avgAttempts.toFixed(2) +
+  ' rawSolvableRate=' + report.rawSolvableRate.toFixed(3) +
+  ' avgRowPairs=' + report.avgRowComplementPairs.toFixed(2) +
+  ' avgStockAdjacentPairs=' + report.avgStockAdjacentPairs.toFixed(2) +
   ' hintPyramidCleared=' + report.hintPyramidCleared + '/' + report.hintSamples +
   ' failures=' + report.failures.length,
 )

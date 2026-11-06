@@ -68,10 +68,10 @@ export function shuffle<T>(arr: T[]): T[] {
 
 export function createGame(): GameState {
   try {
-    // 签名不变、语义改为「构造式可解发牌」；返回纯对象，Object.assign 仍可用。
+    // 签名不变、语义为「随机洗牌 + 死局过滤发牌」；返回纯对象，Object.assign 仍可用。
     return createSolvableGame(createDeck())
   } catch (err) {
-    // 最外层 L3 兜底：构造/求解器任何异常都不得阻塞首屏，退回旧版纯随机装配。
+    // 最外层兜底：发牌/求解器任何异常都不得阻塞首屏，退回纯随机装配。
     console.warn('[deal] createGame fallback to legacy shuffle', err)
     const cards = shuffle(createDeck())
     const pyramid: Card[][] = []

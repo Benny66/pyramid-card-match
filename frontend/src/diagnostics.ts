@@ -1,9 +1,9 @@
 // QA 诊断入口：纯函数，可被 Node 22 原生 type-stripping 直接运行（无需新依赖）。
-// 结构断言 + 双目标可解率 + plan 回放 + 发牌/提示耗时 + 全程按提示重放采样。
+// 结构断言 + 双目标可解率 + 随机性指标 + 发牌/提示耗时 + 全程按提示重放采样。
 import type { Card, GameState } from './game.ts'
 import { createGame, evaluate, selectOrMatch, drawOne } from './game.ts'
 import { deriveSolverState, createSolverContext, isSolvable } from './solver.ts'
-import { replayPlan, getActiveDealMeta } from './deal.ts'
+import { getActiveDealMeta } from './deal.ts'
 import { getHint } from './hint.ts'
 import type { HintMove } from './hint.ts'
 
@@ -12,7 +12,14 @@ export interface VerifyReport {
   structureOk: number
   pyramidSolvable: number
   fullSolvable: number
-  planReplayOk: number
+  /** 平均每次发牌洗了几副牌（含最终接受的那副）；1 表示第一次随机牌局就可解。 */
+  avgAttempts: number
+  /** 筛选前随机牌局的可解率 ≈ 接受数 / 总洗牌数；构造式发牌下无意义，随机发牌应约 0.67。 */
+  rawSolvableRate: number
+  /** 金字塔同一行内和为 13 的配对总数均值；构造式发牌恒为 12，随机发牌应明显更低。 */
+  avgRowComplementPairs: number
+  /** 手牌堆相邻两张和为 13 的对数均值；构造式发牌恒为 12，随机发牌应约 1~2。 */
+  avgStockAdjacentPairs: number
   fallbackCount: number
   avgCreateMs: number
   maxCreateMs: number
@@ -42,7 +49,7 @@ function now(): number {
     : Date.now()
 }
 
-/** 与 deal.ts 同源的固定种子 RNG，用于注入可复现的 Math.random。 */
+/** 固定种子 RNG，用于注入可复现的 Math.random。 */
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0
   return () => {
@@ -91,6 +98,26 @@ function pyramidCleared(s: GameState): boolean {
   return deriveSolverState(s).alive === 0
 }
 
+/** 随机性指标 1：每行内部能凑成 13 的配对数之和（构造式发牌恒为 12）。 */
+function rowComplementPairs(s: GameState): number {
+  let total = 0
+  for (const row of s.pyramid) {
+    const cnt: number[] = new Array<number>(14).fill(0)
+    for (const c of row) cnt[c.value] += 1
+    for (let v = 1; v <= 6; v++) total += Math.min(cnt[v], cnt[13 - v])
+  }
+  return total
+}
+
+/** 随机性指标 2：手牌堆相邻两张凑 13 的对数（构造式发牌恒为 12）。 */
+function stockAdjacentPairs(s: GameState): number {
+  let n = 0
+  for (let i = 0; i + 1 < s.stock.length; i++) {
+    if (s.stock[i].value + s.stock[i + 1].value === 13) n += 1
+  }
+  return n
+}
+
 /** 把提示走法忠实重放到真实 GameState（selectOrMatch / drawOne 原逻辑）。 */
 function applyHintMove(s: GameState, move: HintMove): boolean {
   const byId = new Map<number, Card>()
@@ -109,7 +136,7 @@ function applyHintMove(s: GameState, move: HintMove): boolean {
   return selectOrMatch(s, b) === 'removed'
 }
 
-/** 从 N 副构造牌局出发全程只按 getHint() 走，统计金字塔清空 / degraded / 耗时。 */
+/** 从 N 副随机牌局出发全程只按 getHint() 走，统计金字塔清空 / degraded / 耗时。 */
 export function verifyHints(samples: number): HintVerifyReport {
   const rep: HintVerifyReport = {
     samples,
@@ -154,14 +181,17 @@ export function verifyHints(samples: number): HintVerifyReport {
   return rep
 }
 
-/** S1 主入口：批量调用 createGame()（真实路径，含 try/catch 与三级兜底）。 */
+/** S1 主入口：批量调用 createGame()（真实路径：随机洗牌 + 死局过滤）。 */
 export function verifyDeals(n: number, options: { seed?: number } = {}): VerifyReport {
   const report: VerifyReport = {
     total: n,
     structureOk: 0,
     pyramidSolvable: 0,
     fullSolvable: 0,
-    planReplayOk: 0,
+    avgAttempts: 0,
+    rawSolvableRate: 0,
+    avgRowComplementPairs: 0,
+    avgStockAdjacentPairs: 0,
     fallbackCount: 0,
     avgCreateMs: 0,
     maxCreateMs: 0,
@@ -177,6 +207,10 @@ export function verifyDeals(n: number, options: { seed?: number } = {}): VerifyR
   try {
     const createTimes: number[] = []
     const hintTimes: number[] = []
+    let totalAttempts = 0
+    let rowPairsSum = 0
+    let stockPairsSum = 0
+
     for (let i = 0; i < n; i++) {
       const t0 = now()
       const s = createGame()
@@ -197,14 +231,20 @@ export function verifyDeals(n: number, options: { seed?: number } = {}): VerifyR
       else report.failures.push('#' + i + ' full=' + fv)
 
       const meta = getActiveDealMeta()
-      if (replayPlan(s, meta.plan)) report.planReplayOk += 1
-      else report.failures.push('#' + i + ' planReplay 失败')
+      totalAttempts += meta.stats.attempts
       if (meta.stats.fallback) report.fallbackCount += 1
+      rowPairsSum += rowComplementPairs(s)
+      stockPairsSum += stockAdjacentPairs(s)
 
       const h0 = now()
       getHint(s)
       hintTimes.push(now() - h0)
     }
+
+    report.avgAttempts = totalAttempts / Math.max(1, n)
+    report.rawSolvableRate = totalAttempts > 0 ? n / totalAttempts : 0
+    report.avgRowComplementPairs = rowPairsSum / Math.max(1, n)
+    report.avgStockAdjacentPairs = stockPairsSum / Math.max(1, n)
 
     const cs = statsOf(createTimes)
     report.avgCreateMs = cs.avg
