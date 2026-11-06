@@ -4,6 +4,8 @@
 
 **Vue 3.5 · Vite 6 · TypeScript 5.7　|　纯前端 · 零后端 · 零网络请求 · 离线可玩　|　简体中文**
 
+**在线体验**：[点此打开游戏](https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC)　·　无需注册，打开即玩
+
 ![桌面首屏：打开页面即进入游戏](docs/screenshots/01-first-screen.png)
 
 *图 1　打开页面即进入游戏：7 层 28 张金字塔 + 手牌区 + 精简 HUD，0 次点击即可开始消牌。*
@@ -48,7 +50,7 @@
 
 ### 立即试玩
 
-线上版本由 WorkBuddy 已发布的应用承载，打开应用卡片即可玩（见「线上版本」）。本地可克隆仓库后，用任意静态服务器托管**项目根目录**再访问 [`index.html`](index.html)，例如 `python3 -m http.server 8899` 后打开 `http://127.0.0.1:8899/index.html`；直接用 `file://` 打开会被浏览器对 ES module 的 CORS 策略拦截。无需注册、不限次数、全程离线。
+直接打开[在线体验地址](https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC)即可玩（无需注册、打开即玩）。本地可克隆仓库后，用任意静态服务器托管**项目根目录**再访问 [`index.html`](index.html)，例如 `python3 -m http.server 8899` 后打开 `http://127.0.0.1:8899/index.html`；直接用 `file://` 打开会被浏览器对 ES module 的 CORS 策略拦截。无需注册、不限次数、全程离线。
 
 ### 本地开发
 
@@ -127,7 +129,7 @@ pyramid-card-match/
 
 线上版本由 **WorkBuddy 已发布的应用**（应用名：金字塔消牌）承载，内容就是同一份项目根 `index.html` + `assets/` 静态产物；发布为**覆盖更新**，分享链接保持不变。
 
-> 本仓库为**公开仓库**，因此 README **不写入任何带 sharecode 的分享链接，也不含任何密钥**。请以 WorkBuddy 应用卡片或项目维护者提供的入口为准。
+> 在线体验：[https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC](https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC)（公开分享地址，无需登录）。本仓库为公开仓库，README **不含任何密钥或账号凭据**。
 
 ## 许可 · 维护 · 反馈<a name="license"></a>
 

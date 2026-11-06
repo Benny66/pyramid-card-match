@@ -157,3 +157,86 @@ ROUTE: NoOne
 - 未执行 `npm run build` / `npm run verify` / 发布；根 `index.html` 与 `assets/*` mtime 仍为 16:18。
 
 **最终结论：36 PASS / 0 FAIL，ROUTE: NoOne。**
+
+---
+
+## 十、在线体验地址补充核对
+
+> **触发**：用户新要求「README.md 没有在线体验地址」+「更新到线上」；工程师仅改动 `README.md`（137→139 行）与 `AGENTS.md` §4.10（L130 附近，164→166 行）。
+> **在线体验 URL（逐字）**：`https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC`
+> **核对基线**：`HEAD = 6ee9a7e`（已提交第一轮 README / AGENTS.md / 本报告 / 4 张截图）。所有比对均相对该提交。
+> **执行边界**：全程只读；**未新建任何文件**（仅在本报告末尾追加本节）；仅执行只读 git 查询（`status` / `diff` / `show` / `ls-files` / `diff --name-only`），**未 `git add` / `commit` / `push` / 发布**；未重跑 `npm run build` / `verify`。
+> **效力声明**：本节结论**覆盖**本报告 §4「D5 全文无 sharecode」、§9 观察项 1，以及 `docs/readme-benchmark.md` §4.4 / §8 Q7 的旧结论 —— 按 `AGENTS.md` §4.10 第三条，这些旧结论属改版当时的历史记录、已被覆盖；两份历史文档按约定**保留原样不改**。
+
+### 10.1 汇总
+
+| 指标 | 结果 |
+| --- | --- |
+| 检查项 | **16** |
+| PASS | **16** |
+| FAIL | **0** |
+| **路由** | **ROUTE: NoOne** |
+
+| # | 检查项 | 结论 | 证据（行号 / 命令输出摘要） |
+| --- | --- | --- | --- |
+| J1 | README 中该 URL 出现 **4 次**且逐字一致 | **PASS** | Python 精确计数：`L7`×1、`L53`×1、`L132`×2 = **4**；4 处字符串与给定 URL 完全相同；`sharecode=` 在 README 共 4 次、在 AGENTS.md 共 1 次；无其它 `workbuddy.host` 域名（集合仅 `https://pyramid-card-game.app.workbuddy.host`） |
+| J2 | 4 次均为**可点击 Markdown 链接**（Hero / 立即试玩 / 线上版本章的显示文本与 href） | **PASS** | 解析出 3 个含该 URL 的 Markdown 链接，href 均等于该 URL：`L7` `[点此打开游戏](URL)`、`L53` `[在线体验地址](URL)`、`L132` `[URL](URL)`（显示文本本身也是该 URL，故该行出现 2 次）。即 3 个 href + 1 个显示文本 = 4 次，全部落在 `[...](...)` 链接语法内，渲染后可点击 |
+| J3 | `curl` 返回 **200** | **PASS** | `curl -s -o /dev/null -w '%{http_code}' --max-time 25 '<URL>'` → `HTTP_CODE=200 TIME=0.425147s`，`curl_rc=0`，`url_effective` 与给定 URL 一致（无跳转改写） |
+| J4 | README 旧护栏句「不写入任何带 sharecode 的分享链接」已清除 | **PASS** | 全文命中 **0**；连同旧句后半「请以 WorkBuddy 应用卡片或项目维护者提供的入口为准」命中 **0**。`L132` 已替换为「在线体验：…（公开分享地址，无需登录）。本仓库为公开仓库，README **不含任何密钥或账号凭据**。」 |
+| J5 | `AGENTS.md` 旧句「任何文档都不要写死带 sharecode 的分享链接」已清除 | **PASS** | 全文命中 **0**；`git diff` 显示该行被 `-` 删除，替换为 3 条新要点 |
+| J6 | 新 §4.10 要点 ①「用户 2026-11-06 明确授权公开该链接」 | **PASS** | `AGENTS.md:130`「**在线体验地址（用户 2026-11-06 本轮明确要求）**：README **可以且应当写入公开分享链接** `https://...ZD67FNJVGC`（覆盖更新时链接不变）；该地址是公开分享入口，不是密钥，线上入口以 README 中的在线体验地址为准。」 |
+| J7 | 新 §4.10 要点 ②「仍严禁密钥 / 账号凭据 / token」 | **PASS** | `AGENTS.md:131`「**仍严禁写入**任何**密钥 / 账号凭据 / token**，以及 `.wbapp_*.genie` 中 locator 值之类的内部标识；这些内部标识只留在本地应用卡片里，不进任何文档。」 |
+| J8 | 新 §4.10 要点 ③「旧结论是历史记录、已被覆盖」 | **PASS** | `AGENTS.md:132` 逐字点名 `docs/readme-benchmark.md` §4.4 / §8 Q7 与 `docs/qa-readme-review.md`，写明「属**改版当时的历史结论，已被本条覆盖**；两份历史文档保留原样不改，**后续 Agent 一律以本条为准**」 |
+| J9 | 免责声明 3 条 bullet 逐字未改 | **PASS** | 与 `HEAD:README.md` 逐字比对：主免责句 1 次、3 条 bullet 去 `> ` 前缀后 `True / True / True`（新 `L17-19`）；仍位于前 1/4（`L13/139 = 9.4%`） |
+| J10 | TOC 仍 11 个 `#anchor` 且全部命中 | **PASS** | `L23-25` 共 **11** 个锚点，逐个命中 `<a name>`；全文 `<a name>` 共 12 个（另含 `toc`） |
+| J11 | 4 张图片引用路径不变、文件仍存在 | **PASS** | 新/HEAD 引用列表完全一致：`01-first-screen.png`(L9)、`02-hint-highlight.png`(L42)、`03-modals.png`(L44)、`04-mobile-375.png`(L46)，`os.path.exists` 全 True；仅因新增 2 行而下移 2 行 |
+| J12 | 快速开始命令与 `frontend/package.json` 一致、命令块未改 | **PASS** | `L63-65` 三条 `npm run dev / build / verify -- 1000` 与 HEAD 逐字相同；`package.json:7-9` 分别 `vite --host 0.0.0.0` / `vite build && node sync.mjs` / `node scripts/verify-deals.mjs`；`L57` 的 preview / corpus 说明未改；本机未跑 build（根 `index.html` / `assets/*` mtime 仍 **16:18:10**，README/AGENTS 为 17:40） |
+| J13 | 4 张截图与其它 docs 文件 **mtime / 内容未变** | **PASS** | `stat` 与第一轮基线逐一吻合：截图 `01` 17:15:11、`02` 16:58:08、`03` 16:58:11、`04` 16:58:13；`architecture-v3.md` 15:16:42、`prd-v3-incremental.md` 14:56:33、`qa-v3-delivery-check.md` 16:31:47、`readme-benchmark.md` 16:52:38、`class-diagram.mermaid` 15:17:09、`sequence-diagram.mermaid` 15:17:25。`git diff --name-only HEAD -- docs/` 输出 **空**（docs/ 下所有已跟踪文件与 HEAD 一致）；`docs/qa-readme-review.md` 仅在追加本节时变化（预期） |
+| J14 | 无密钥 / 凭据 / token / locator 等敏感信息（sharecode 除外，已获授权） | **PASS** | README + AGENTS.md 扫描 `sk-`/`ghp_`/`github_pat_`/`xox*-`、`token|password|secret|api_key\s*[:=]`、`.wbapp_*.genie` 实际 locator 值、私钥/凭据字样：**均 0 命中**；「≥24 位十六进制 / ≥32 位 base64」在 AGENTS.md L44 命中 1 处，经核为字段名连写 `structureOk/pyramidSolvable/fullSolvable/planReplayOk`，**非密钥，误报**。`ZD67FNJVGC` 是用户本轮明确授权公开的分享码，按 §4.10 第 1 条「不是密钥」 |
+| J15 | `git diff -- README.md AGENTS.md` 差异仅限链接与护栏相关行 | **PASS** | README 3 处 hunk：① 头部 `+2` 行（空行 + `**在线体验**：[点此打开游戏](URL)…`）② `L53` 1 行替换（旧「打开应用卡片即可玩」→ 新「直接打开[在线体验地址](URL)即可玩」，本地静态托管说明原样保留）③ `L132` 1 行替换（旧护栏句 → 在线体验链接 + 「不含任何密钥或账号凭据」）。AGENTS.md 1 处 hunk：L130 `-1 / +3` 行（旧护栏句 → 三条新要点）。`difflib` 逐行比对确认**无第四处改动**，未夹带免责 / 玩法 / FAQ / 章节 / 锚点等其它改写 |
+| J16 | `git status --short` 恰为 3 个修改项（追加报告后） | **PASS** | 追加前：` M AGENTS.md` / ` M README.md`（其余 docs 文件已在 `6ee9a7e` 提交，故无 `??`）；追加本节后复核见 §10.4。全程**未 `git add`** |
+
+### 10.2 关键证据补充
+
+**URL 4 处原文**
+
+```text
+L7   **在线体验**：[点此打开游戏](https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC)　·　无需注册，打开即玩
+L53  直接打开[在线体验地址](https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC)即可玩（无需注册、打开即玩）。本地可克隆仓库后…
+L132 > 在线体验：[https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC](https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC)（公开分享地址，无需登录）。本仓库为公开仓库，README **不含任何密钥或账号凭据**。
+```
+
+**curl**：`HTTP_CODE=200 TIME=0.425147s URL=https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC`，`curl_rc=0`。
+
+**差异规模**：`wc -l` → README **139**、AGENTS.md **166**、本报告追加前 159；`git diff --stat -- README.md AGENTS.md` 仅涉及上述 4 处行。
+
+### 10.3 观察项（均判 PASS，非 FAIL）
+
+1. **旧结论的历史化是对的**：本报告 §4 D5 / §9 观察项 1 与 `docs/readme-benchmark.md` §4.4 / §8 Q7 均为「改版当时」的结论；用户 2026-11-06 已明确授权公开该链接，`AGENTS.md §4.10` 第 3 条已按约定把两份历史文档标记为历史记录并声明后续 Agent 以新条为准，且历史文档**未改一字**（`git diff --name-only HEAD -- docs/` 为空）——处理方式与约定一致。本节正式覆盖上述旧结论。
+2. **Hero 措辞的可选优化（非缺陷）**：`L3`「打开页面就能玩，不用注册、**不用联网**」与 `L5`「零网络请求 · 离线可玩」描述的是**应用运行时不请求任何接口**（且 `L53` 仍保留本地静态服务器托管、`file://` CORS 说明）；新增的在线地址只是**静态托管入口**，加载页面本身需要网络。二者在技术上不冲突，但若主理人希望措辞更严谨，可考虑把 Hero 的「不用联网」改为「无需注册、无需登录」或「本地也可离线玩」。**属可选文案优化，不构成 FAIL，本轮不建议改动**（用户明确要求的是加在线地址）。
+3. **唯一残留 http 字面量**：`L53` 的 `http://127.0.0.1:8899/index.html` 仍是本地回环静态服务器示例，非外链图床 / 徽章 / 密钥。
+4. **敏感扫描误报**：AGENTS.md L44「长随机串」命中为字段名连写，已核实非密钥（见 J14）。
+
+**命令执行说明**：本轮所有命令均正常返回；`curl` 一次成功（200）；只读 git 查询全部成功。无命令失败需记录。
+
+### 10.4 路由判定与复核
+
+```
+ROUTE: NoOne
+```
+
+- **理由**：16/16 PASS、0 FAIL。链接可达（HTTP 200）、4 处逐字一致且可点击、旧护栏清除、新 §4.10 三要点齐全、无回归、差异范围受限、提交范围干净 → 既无需 Engineer 修正，也无需 QA 自修，无 Known Issues。
+- **精确修正建议文本**：无（0 FAIL）。上述 §10.3-2 为可选文案优化，非缺陷修复。
+- **未执行**：`git add` / `commit` / `push` / 发布 / `npm run build` / `npm run verify`；未新建文件；仅向本报告追加本节。
+
+**追加本节后的 `git status --short` 复核**（只读，J16 证据）：
+
+```text
+ M AGENTS.md
+ M README.md
+ M docs/qa-readme-review.md
+```
+
+`git status --porcelain=v1 -uall` 同为上述 3 条、**无 `??` 未跟踪文件**；`git diff --stat` = `AGENTS.md 4 ++-` / `README.md 6 ++--` / `docs/qa-readme-review.md 73 +++++`（即仅本节追加）；根 `index.html` 与 `assets/*` mtime 仍为 **16:18:10**，确认未 build。报告现为 **232 行**。
+
+**本节最终结论：16 PASS / 0 FAIL，ROUTE: NoOne。**

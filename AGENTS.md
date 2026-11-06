@@ -127,7 +127,9 @@ npm run build            # 构建 + 同步到项目根；确认根 index.html �
 
 - **每次发布 / 上线 / 更新到线上，都需要用户在「本轮」对话里明确说「发布」「上线」「更新到线上」才能执行；之前轮次的同意不沿用、不推断、不「顺手」发布。**
 - 发布是**覆盖更新**：分享链接不变，内容替换为最新一次 `npm run build` 同步到项目根 `index.html` + `assets/` 的产物。因此发版前必须先 `npm run build`，且确认根产物已提交。
-- 公开仓库：**任何文档都不要写死带 sharecode 的分享链接、不要写入任何密钥**；线上入口以 WorkBuddy 应用卡片为准。
+- **在线体验地址（用户 2026-11-06 本轮明确要求）**：README 可以且应当写入公开分享链接 `https://pyramid-card-game.app.workbuddy.host/?sharecode=ZD67FNJVGC`（覆盖更新时链接不变）；该地址是公开分享入口，不是密钥，线上入口以 README 中的在线体验地址为准。
+- **仍严禁写入**任何**密钥 / 账号凭据 / token**，以及 `.wbapp_*.genie` 中 locator 值之类的内部标识；这些内部标识只留在本地应用卡片里，不进任何文档。
+- `docs/readme-benchmark.md` §4.4 / §8 Q7 与 `docs/qa-readme-review.md` 中「不写 sharecode」属**改版当时的历史结论，已被本条覆盖**；两份历史文档保留原样不改，后续 Agent 一律以本条为准。
 
 ---
 
